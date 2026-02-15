@@ -7,12 +7,393 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
-  output = "../generated/client"
+  output   = "../generated/client"
 }
 
+// ============== USER MODEL ==============
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String?   @unique
   emailVerified DateTime?
+  image         String?
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Bookings
+  hotelBookings  HotelBooking[]
+  flightBookings FlightBooking[]
+  trainBookings  TrainBooking[]
+
+  // Reviews
+  reviews Review[]
+
+  // Payments
+  payments Payment[]
+}
+
+// ============== HOTEL MODELS ==============
+model Hotel {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  address     String
+  city        String
+  state       String?
+  country     String
+  zipCode     String?
+  latitude    Float?
+  longitude   Float?
+  starRating  Int?     @db.SmallInt
+  images      String[]
+  amenities   String[]
+  policies    String?
+  checkInTime String?
+  checkOutTime String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  rooms    Room[]
+  bookings HotelBooking[]
+  reviews  Review[]
+
+  @@index([city])
+  @@index([country])
+  @@index([starRating])
+  @@index([isActive])
+}
+
+model Room {
+  id          String   @id @default(cuid())
+  hotelId     String
+  name        String
+  description String?
+  roomType    RoomType
+  bedType     String?
+  maxGuests   Int      @default(2)
+  sizeSqft    Int?
+  images      String[]
+  amenities   String[]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  rates RoomRate[]
+
+  @@index([hotelId])
+  @@index([roomType])
+}
+
+model RoomRate {
+  id        String   @id @default(cuid())
+  roomId    String
+  date      DateTime @db.Date
+  price     Decimal  @db.Decimal(10, 2)
+  currency  String   @default("INR")
+  available Int      @default(10)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, date])
+  @@index([roomId])
+  @@index([date])
+  @@index([price])
+}
+
+model HotelBooking {
+  id            String            @id @default(cuid())
+  userId        String
+  hotelId       String
+  roomId        String
+  checkInDate   DateTime          @db.Date
+  checkOutDate  DateTime          @db.Date
+  guests        Int
+  guestDetails  Json?
+  totalPrice    Decimal           @db.Decimal(10, 2)
+  currency      String            @default("INR")
+  status        BookingStatus     @default(PENDING)
+  paymentStatus PaymentStatus     @default(PENDING)
+  specialRequests String?
+  bookingReference String         @unique @default(cuid())
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hotel   Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  payment Payment?
+
+  @@index([userId])
+  @@index([hotelId])
+  @@index([checkInDate])
+  @@index([status])
+  @@index([bookingReference])
+}
+
+// ============== FLIGHT MODELS ==============
+model Flight {
+  id              String      @id @default(cuid())
+  flightNumber    String
+  airline         String
+  airlineCode     String
+  fromAirport     String
+  fromCity        String
+  toAirport       String
+  toCity          String
+  departureTime   DateTime
+  arrivalTime     DateTime
+  duration        Int // in minutes
+  stops           Int         @default(0)
+  stopDetails     Json?
+  aircraftType    String?
+  baggageInfo     Json?
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  fares    FlightFare[]
+  bookings FlightBooking[]
+
+  @@index([fromCity])
+  @@index([toCity])
+  @@index([departureTime])
+  @@index([airline])
+}
+
+model FlightFare {
+  id           String    @id @default(cuid())
+  flightId     String
+  fareClass    FareClass @default(ECONOMY)
+  price        Decimal   @db.Decimal(10, 2)
+  currency     String    @default("INR")
+  seatsAvailable Int     @default(0)
+  amenities    String[]
+  isRefundable Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  flight Flight @relation(fields: [flightId], references: [id], onDelete: Cascade)
+
+  @@index([flightId])
+  @@index([fareClass])
+  @@index([price])
+}
+
+model FlightBooking {
+  id              String        @id @default(cuid())
+  userId          String
+  flightId        String
+  fareClass       FareClass     @default(ECONOMY)
+  passengers      Int
+  passengerDetails Json?
+  totalPrice      Decimal       @db.Decimal(10, 2)
+  currency        String        @default("INR")
+  seatNumbers     String[]
+  status          BookingStatus @default(PENDING)
+  paymentStatus   PaymentStatus @default(PENDING)
+  bookingReference String       @unique @default(cuid())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flight  Flight  @relation(fields: [flightId], references: [id], onDelete: Cascade)
+  payment Payment?
+
+  @@index([userId])
+  @@index([flightId])
+  @@index([status])
+  @@index([bookingReference])
+}
+
+// ============== TRAIN MODELS ==============
+model Train {
+  id            String   @id @default(cuid())
+  trainNumber   String   @unique
+  trainName     String
+  fromStation   String
+  fromCity      String
+  toStation     String
+  toCity        String
+  departureTime DateTime
+  arrivalTime   DateTime
+  duration      Int // in minutes
+  daysOfWeek    Int[] // 0=Sunday, 1=Monday, etc.
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  classes  TrainClass[]
+  bookings TrainBooking[]
+
+  @@index([fromCity])
+  @@index([toCity])
+  @@index([trainNumber])
+}
+
+model TrainClass {
+  id           String    @id @default(cuid())
+  trainId      String
+  classType    TrainClassType
+  price        Decimal   @db.Decimal(10, 2)
+  currency     String    @default("INR")
+  seatsAvailable Int     @default(0)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  train Train @relation(fields: [trainId], references: [id], onDelete: Cascade)
+
+  @@index([trainId])
+  @@index([classType])
+}
+
+model TrainBooking {
+  id              String         @id @default(cuid())
+  userId          String
+  trainId         String
+  classType       TrainClassType
+  passengers      Int
+  passengerDetails Json?
+  totalPrice      Decimal        @db.Decimal(10, 2)
+  currency        String         @default("INR")
+  seatNumbers     String[]
+  status          BookingStatus  @default(PENDING)
+  paymentStatus   PaymentStatus  @default(PENDING)
+  pnrNumber       String?        @unique
+  bookingReference String        @unique @default(cuid())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  train  Train  @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  payment Payment?
+
+  @@index([userId])
+  @@index([trainId])
+  @@index([pnrNumber])
+  @@index([bookingReference])
+}
+
+// ============== REVIEW MODEL ==============
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  hotelId   String?
+  rating    Int      @db.SmallInt
+  comment   String?
+  images    String[]
+  isVerified Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hotel Hotel? @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId])
+  @@index([userId])
+  @@index([rating])
+}
+
+// ============== PAYMENT MODEL ==============
+model Payment {
+  id              String        @id @default(cuid())
+  userId          String
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("INR")
+  paymentMethod   PaymentMethod
+  transactionId   String?       @unique
+  status          PaymentStatus @default(PENDING)
+  
+  // Polymorphic relation fields
+  hotelBookingId  String?       @unique
+  flightBookingId String?       @unique
+  trainBookingId  String?       @unique
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hotelBooking    HotelBooking?  @relation(fields: [hotelBookingId], references: [id])
+  flightBooking   FlightBooking? @relation(fields: [flightBookingId], references: [id])
+  trainBooking    TrainBooking?  @relation(fields: [trainBookingId], references: [id])
+
+  @@index([userId])
+  @@index([transactionId])
+  @@index([status])
+}
+
+// ============== ENUMS ==============
+enum RoomType {
+  STANDARD
+  DELUXE
+  SUPER_DELUXE
+  SUITE
+  PRESIDENTIAL_SUITE
+  EXECUTIVE
+  FAMILY
+  SINGLE
+  DOUBLE
+  TWIN
+}
+
+enum FareClass {
+  ECONOMY
+  PREMIUM_ECONOMY
+  BUSINESS
+  FIRST_CLASS
+}
+
+enum TrainClassType {
+  SL // Sleeper
+  AC3 // 3 Tier AC
+  AC2 // 2 Tier AC
+  AC1 // First Class AC
+  CC // Chair Car
+  EC // Executive Chair Car
+  GENERAL
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  NET_BANKING
+  WALLET
+  PAY_LATER
+  CASH
 }
