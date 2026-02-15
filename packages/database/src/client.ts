@@ -6,6 +6,11 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 // 1. Create the Pool specifically for the adapter
 const connectionString = process.env.DATABASE_URL;
+if (typeof connectionString !== "string" || connectionString.trim().length === 0) {
+  throw new Error(
+    "Missing DATABASE_URL. Load env before importing the Prisma client."
+  );
+}
 
 const pool = new Pool({
   connectionString
